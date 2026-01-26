@@ -3,6 +3,7 @@ from app.routers import health
 from app.routers import documents
 from app.routers.documents import fake_db
 from app.schemas.response import APIResponse
+from app.services.embedding import get_embedding
 
 app = FastAPI(title = "AI RAG system")
 
