@@ -13,11 +13,11 @@ class DocumentSchema(BaseModel) :
     id : int
     title : str
     content : str
-    embeddings : List[float] | None = None
+    embedding : List[float] | None = None
 
 @router.post("/", response_model=DocumentSchema)
 def create_document(doc: DocumentSchema):
-    doc.embeddings = get_embedding(doc.content)
+    doc.embedding = get_embedding(doc.content)
     fake_db.append(doc)
     return doc
 
