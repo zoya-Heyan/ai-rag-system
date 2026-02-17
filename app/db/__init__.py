@@ -5,6 +5,10 @@ from app.db.database import (
     create_document as db_create_document,
     update_document,
     delete_document,
+    delete_chunks_by_document_id,
+    insert_chunks,
+    get_all_chunks_with_document_info,
+    get_chunks_by_document_id,
 )
 
 __all__ = [
@@ -14,4 +18,8 @@ __all__ = [
     "db_create_document",
     "update_document",
     "delete_document",
+    "delete_chunks_by_document_id",
+    "insert_chunks",
+    "get_all_chunks_with_document_info",
+    "get_chunks_by_document_id",
 ]
