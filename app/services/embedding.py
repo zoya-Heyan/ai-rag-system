@@ -1,46 +1,43 @@
+import asyncio
+import threading
 from typing import List
 
-from openai import AsyncOpenAI, OpenAI
+from sentence_transformers import SentenceTransformer
 
 from app.core.config import settings
 
-_client: OpenAI | None = None
-_async_client: AsyncOpenAI | None = None
+_lock = threading.Lock()
+_model: SentenceTransformer | None = None
 
 
-def _get_client() -> OpenAI:
-    global _client
-    if _client is None:
-        if not settings.OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
-        _client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    return _client
+def _get_model() -> SentenceTransformer:
+    global _model
+    if _model is not None:
+        return _model
+    with _lock:
+        if _model is None:
+            _model = SentenceTransformer(settings.EMBEDDING_MODEL)
+        return _model
 
 
-def _get_async_client() -> AsyncOpenAI:
-    global _async_client
-    if _async_client is None:
-        if not settings.OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
-        _async_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    return _async_client
+def _embed_sync(text: str) -> List[float]:
+    model = _get_model()
+    vec = model.encode(
+        text,
+        normalize_embeddings=True,
+        convert_to_numpy=True,
+        show_progress_bar=False,
+    )
+    return vec.astype("float32").tolist()
 
 
 def get_embedding(text: str) -> List[float]:
-    """Get embedding vector for text (sync). Raises ValueError if API key missing."""
-    client = _get_client()
-    response = client.embeddings.create(
-        model=settings.EMBEDDING_MODEL,
-        input=text,
-    )
-    return response.data[0].embedding
+    """Get embedding vector for text (sync, local sentence-transformers)."""
+    if not text:
+        return _embed_sync("")
+    return _embed_sync(text)
 
 
 async def get_embedding_async(text: str) -> List[float]:
-    """Get embedding vector for text (async). Raises ValueError if API key missing."""
-    client = _get_async_client()
-    response = await client.embeddings.create(
-        model=settings.EMBEDDING_MODEL,
-        input=text,
-    )
-    return response.data[0].embedding
+    """Get embedding vector for text (async, runs in a worker thread)."""
+    return await asyncio.to_thread(get_embedding, text)

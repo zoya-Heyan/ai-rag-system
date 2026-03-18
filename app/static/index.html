@@ -34,7 +34,7 @@
         <div class="card__title">检索问答</div>
         <div class="field">
           <label class="label" for="queryInput">问题</label>
-          <textarea id="queryInput" class="input" rows="3" placeholder="例如：这套系统支持哪些存储后端？"></textarea>
+          <textarea id="queryInput" class="input" rows="3" placeholder="例如：这套系统默认 TOP_K=3，支持哪些存储后端？"></textarea>
         </div>
         <div class="row row--between row--gap">
           <label class="check">
@@ -92,8 +92,8 @@
 
     <footer class="footer">
       <div class="container footer__row">
-        <div class="muted">RAG system</div>
-        <div class="muted">Tips: 先创建几篇文档，再进行检索问答效果更好。</div>
+        <div class="muted">RAG system（Qwen 7B + bge-small-zh）</div>
+        <div class="muted">Tips: 默认 chunk_size≈400、TOP_K=3；先创建几篇文档，再检索问答效果更好。</div>
       </div>
     </footer>
 
