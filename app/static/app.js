@@ -6,6 +6,156 @@ const state = {
   docFilter: "",
 };
 
+const I18N = {
+  zh: {
+    brandTitle: "AI RAG System",
+    brandSubtitle: "Documents · Vector Search · LLM Answer",
+    btnReload: "刷新",
+    systemStatus: "系统状态",
+    healthOut: "点击上面的按钮查看状态…",
+    searchQA: "检索问答",
+    queryLabel: "问题",
+    queryHint: "⌘/Ctrl + Enter 发送",
+    clearQuery: "清空问题",
+    useLlmLabel: "使用 LLM 生成回答",
+    btnSearch: "搜索",
+    answerLabel: "回答",
+    topKLabel: "Top-K 结果",
+    learningTools: "学习工具",
+    genQuestions: "生成习题",
+    genQuestionsLead: "粘贴学习材料，生成高质量练习题（单选/多选/填空/简答），可结合知识库扩展。",
+    useKbLabel: "结合知识库检索（扩展相关知识）",
+    kbQueryLabel: "检索用语（可选，留空则用正文前段）",
+    materialLabel: "学习材料",
+    btnGenQuestions: "生成习题",
+    btnClear: "清空",
+    btnPreview: "预览",
+    btnRaw: "源码",
+    btnCopyMd: "复制 Markdown",
+    btnCopy: "复制",
+    btnDownloadMd: "下载 .md",
+    genNotes: "笔记生成（Markdown）",
+    genNotesLead: "按主题检索知识库并生成结构化笔记（标题、列表、要点）。",
+    btnGenNotes: "生成笔记",
+    questionAnalysis: "题目解析",
+    questionAnalysisLead: "输入题目和答案，获取详细知识点解析与延伸讲解。",
+    questionContent: "题目内容",
+    correctAnswerOpt: "正确答案（可选）",
+    btnStartAnalysis: "开始解析",
+    docManagement: "文档管理",
+    addDoc: "新增文档",
+    docTitleLabel: "标题",
+    docContentLabel: "内容",
+    importWordLabel: "从 Word 导入（.docx）",
+    dropzoneText: "拖拽 .docx 到此处，或点击下方选择文件",
+    dropzoneHint: "服务端解析后自动创建文档并建索引（≤20MB）",
+    dropzoneOr: "或",
+    selectDocx: "选择 .docx",
+    btnCreate: "创建",
+    docList: "文档列表",
+    btnRefreshList: "刷新列表",
+    filterLabel: "过滤",
+    footerTech: "RAG system（Qwen 7B + bge-small-zh）",
+    footerTips: "Tips: 学习工具支持生成习题与 Markdown 笔记；默认 chunk_size≈400、TOP_K=3。",
+    clearQuery: "清空问题",
+  },
+  en: {
+    brandTitle: "AI RAG System",
+    brandSubtitle: "Documents · Vector Search · LLM Answer",
+    btnReload: "Reload",
+    systemStatus: "System Status",
+    healthOut: "Click a button above to check status…",
+    searchQA: "Search & QA",
+    queryLabel: "Question",
+    queryHint: "⌘/Ctrl + Enter to send",
+    clearQuery: "Clear question",
+    useLlmLabel: "Use LLM to generate answer",
+    btnSearch: "Search",
+    answerLabel: "Answer",
+    topKLabel: "Top-K Results",
+    learningTools: "Learning Tools",
+    genQuestions: "Generate Questions",
+    genQuestionsLead: "Paste study materials to generate high-quality exercises (single/multi-choice, fill-in, essay), with optional knowledge base extension.",
+    useKbLabel: "Use knowledge base retrieval (extend related knowledge)",
+    kbQueryLabel: "Search query (optional, uses first part of text if empty)",
+    materialLabel: "Study Material",
+    btnGenQuestions: "Generate Questions",
+    btnClear: "Clear",
+    btnPreview: "Preview",
+    btnRaw: "Raw",
+    btnCopyMd: "Copy Markdown",
+    btnCopy: "Copy",
+    btnDownloadMd: "Download .md",
+    genNotes: "Notes (Markdown)",
+    genNotesLead: "Search knowledge base by topic and generate structured notes (headings, lists, key points).",
+    btnGenNotes: "Generate Notes",
+    questionAnalysis: "Question Analysis",
+    questionAnalysisLead: "Enter a question and answer to get detailed knowledge analysis and extended explanation.",
+    questionContent: "Question Content",
+    correctAnswerOpt: "Correct Answer (optional)",
+    btnStartAnalysis: "Start Analysis",
+    docManagement: "Document Management",
+    addDoc: "Add Document",
+    docTitleLabel: "Title",
+    docContentLabel: "Content",
+    importWordLabel: "Import from Word (.docx)",
+    dropzoneText: "Drag & drop .docx here, or click to select file",
+    dropzoneHint: "Server parses and creates document with index (≤20MB)",
+    dropzoneOr: "or",
+    selectDocx: "Select .docx",
+    btnCreate: "Create",
+    docList: "Document List",
+    btnRefreshList: "Refresh",
+    filterLabel: "Filter",
+    footerTech: "RAG system (Qwen 7B + bge-small-zh)",
+    footerTips: "Tip: Learning tools generate exercises and Markdown notes; default chunk_size≈400, TOP_K=3.",
+    clearQuery: "Clear question",
+  },
+};
+
+let currentLang = localStorage.getItem("LANG") || "zh";
+
+function applyI18n(lang) {
+  currentLang = lang;
+  localStorage.setItem("LANG", lang);
+  const t = I18N[lang] || I18N.zh;
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.getAttribute("data-i18n");
+    if (t[key]) el.textContent = t[key];
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+    const key = el.getAttribute("data-i18n-title");
+    if (t[key]) el.setAttribute("title", t[key]);
+  });
+  document.querySelectorAll(".langSwitch__btn").forEach((btn) => {
+    btn.classList.toggle("langSwitch__btn--active", btn.getAttribute("data-lang") === lang);
+  });
+}
+
+function applyTheme(theme) {
+  if (theme === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+    $("btnTheme").textContent = "☀️";
+    $("btnTheme").setAttribute("title", currentLang === "zh" ? "切换亮色主题" : "Switch to light theme");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+    $("btnTheme").textContent = "🌙";
+    $("btnTheme").setAttribute("title", currentLang === "zh" ? "切换暗色主题" : "Switch to dark theme");
+  }
+  localStorage.setItem("THEME", theme);
+}
+
+function initTheme() {
+  const saved = localStorage.getItem("THEME");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(saved || (prefersDark ? "dark" : "light"));
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme");
+  applyTheme(current === "dark" ? "light" : "dark");
+}
+
 function setApiBase(base) {
   state.apiBase = base.replace(/\/+$/, "");
   window.localStorage.setItem("API_BASE", state.apiBase);
@@ -502,6 +652,10 @@ async function doSearch() {
 
 function bindEvents() {
   $("btnReload").addEventListener("click", () => window.location.reload());
+  $("btnTheme").addEventListener("click", toggleTheme);
+  document.querySelectorAll(".langSwitch__btn").forEach((btn) => {
+    btn.addEventListener("click", () => applyI18n(btn.getAttribute("data-lang")));
+  });
   $("btnHealth").addEventListener("click", () => loadHealth().catch((e) => toast(e.message, "bad")));
   $("btnIndex").addEventListener("click", () => loadIndexStats().catch((e) => toast(e.message, "bad")));
   $("btnLoadDocs").addEventListener("click", () => loadDocs().catch((e) => toast(e.message, "bad")));
@@ -665,6 +819,8 @@ async function handleDocxFile(file) {
 }
 
 function init() {
+  initTheme();
+  applyI18n(currentLang);
   setApiBase(state.apiBase);
   bindEvents();
   syncQueryCharCount();
