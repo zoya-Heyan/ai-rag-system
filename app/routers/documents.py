@@ -1,7 +1,7 @@
 import asyncio
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -54,13 +54,12 @@ async def _embed_chunks_concurrent(texts: list[str]) -> list[list[float]]:
     return await asyncio.gather(*[one(t) for t in texts])
 
 
-@router.post("/", response_model=DocumentSchema)
-async def create_document(request: Request, body: CreateDocumentSchema):
+async def _create_document_with_chunks(request: Request, title: str, content: str) -> dict:
     chunk_size = settings.CHUNK_SIZE
     overlap = settings.CHUNK_OVERLAP
-    chunks_list = chunk_text(body.content, chunk_size=chunk_size, overlap=overlap)
+    chunks_list = chunk_text(content, chunk_size=chunk_size, overlap=overlap)
     if not chunks_list:
-        chunks_list = [body.content.strip() or body.content]
+        chunks_list = [content.strip() or content]
     try:
         chunk_embeddings = await _embed_chunks_concurrent(chunks_list)
     except ValueError as e:
@@ -70,17 +69,61 @@ async def create_document(request: Request, body: CreateDocumentSchema):
     chunk_rows = [(i, chunks_list[i], chunk_embeddings[i]) for i in range(len(chunks_list))]
     if _use_postgres(request):
         from app.db.postgres import create_document_async, insert_chunks_async
-        doc = await create_document_async(body.title, body.content, None)
+        doc = await create_document_async(title, content, None)
         await insert_chunks_async(doc["id"], chunk_rows)
     else:
         loop = asyncio.get_event_loop()
         executor = request.app.state.executor
         doc = await loop.run_in_executor(
             executor,
-            lambda: db_create_document(title=body.title, content=body.content, embedding=None),
+            lambda: db_create_document(title=title, content=content, embedding=None),
         )
         await loop.run_in_executor(executor, lambda: insert_chunks(doc["id"], chunk_rows))
     enqueue_add_chunks(request.app.state.index_queue, doc["id"])
+    return doc
+
+
+@router.post("/", response_model=DocumentSchema)
+async def create_document(request: Request, body: CreateDocumentSchema):
+    doc = await _create_document_with_chunks(request, body.title, body.content)
+    return DocumentSchema(**doc)
+
+
+_MAX_DOCX_BYTES = 20 * 1024 * 1024
+
+
+@router.post("/import-docx", response_model=DocumentSchema)
+async def import_docx(request: Request, file: UploadFile = File(...)):
+    """Upload a .docx file; extract text server-side and create a document (chunk + embed + index)."""
+    name = (file.filename or "").strip()
+    if not name.lower().endswith(".docx"):
+        raise HTTPException(status_code=400, detail="请上传 .docx 文件")
+    data = await file.read()
+    if len(data) > _MAX_DOCX_BYTES:
+        raise HTTPException(status_code=400, detail="文件过大（上限 20MB）")
+    if not data:
+        raise HTTPException(status_code=400, detail="空文件")
+
+    loop = asyncio.get_event_loop()
+    executor = request.app.state.executor
+
+    def _parse() -> str:
+        from app.services.docx_text import extract_plain_text_from_docx
+
+        return extract_plain_text_from_docx(data)
+
+    try:
+        text = await loop.run_in_executor(executor, _parse)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"无法解析 docx：{e}") from e
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="文档中未解析到有效文本")
+
+    base = name.rsplit("/", 1)[-1]
+    title = base[:-5] if base.lower().endswith(".docx") else base
+    title = title.strip() or "未命名"
+
+    doc = await _create_document_with_chunks(request, title, text)
     return DocumentSchema(**doc)
 
 

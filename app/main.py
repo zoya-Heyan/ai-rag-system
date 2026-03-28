@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db import init_db
-from app.routers import health, documents, search
+from app.routers import health, documents, search, tools
 from app.services.faiss_store import ensure_index
 from app.services.index_queue import start_index_worker
 from pathlib import Path
@@ -54,6 +54,7 @@ if STATIC_DIR.exists():
 app.include_router(health.router)
 app.include_router(documents.router)
 app.include_router(search.router, prefix="/search", tags=["search"])
+app.include_router(tools.router)
 
 @app.get("/")
 def root():

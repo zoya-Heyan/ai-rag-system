@@ -147,12 +147,29 @@ async function loadIndexStats() {
   toast("index stats ok", "ok");
 }
 
-async function loadDocs() {
+async function loadDocs({ silent = false } = {}) {
   const res = await api("/documents/");
   const list = res?.data ?? res;
   state.docs = Array.isArray(list) ? list : [];
   renderDocs();
-  toast(`加载文档：${state.docs.length} 条`, "ok");
+  if (!silent) toast(`加载文档：${state.docs.length} 条`, "ok");
+}
+
+async function apiForm(path, formData) {
+  const url = `${state.apiBase}${path.startsWith("/") ? "" : "/"}${path}`;
+  const res = await fetch(url, { method: "POST", body: formData });
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  if (!res.ok) {
+    const detail = data?.detail || (typeof data === "string" ? data : JSON.stringify(data));
+    throw new Error(`${res.status} ${res.statusText}${detail ? `: ${detail}` : ""}`);
+  }
+  return data;
 }
 
 async function createDoc() {
@@ -197,13 +214,82 @@ async function editDoc(id) {
   await loadDocs();
 }
 
+function syncQueryCharCount() {
+  const countEl = $("queryCharCount");
+  const el = $("queryInput");
+  if (!countEl || !el) return;
+  const n = el.value.length;
+  const max = el.maxLength || 8000;
+  countEl.textContent = `${n} / ${max}`;
+}
+
+async function copyMarkdown(preId) {
+  const el = $(preId);
+  const text = el?.textContent ?? "";
+  if (!text.trim()) {
+    toast("没有可复制的内容", "bad");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("已复制 Markdown", "ok");
+  } catch {
+    toast("复制失败（浏览器权限）", "bad");
+  }
+}
+
+async function doWrongQuestions() {
+  const raw_text = $("wrongInput").value.trim();
+  if (!raw_text) throw new Error("请粘贴错题材料");
+  $("wrongMeta").textContent = "生成中…";
+  $("wrongOut").hidden = true;
+  $("btnWrongCopy").hidden = true;
+  const use_knowledge_base = $("wrongUseKb").checked;
+  const kb_query = $("wrongKbQuery").value.trim() || null;
+  const top_k = Number($("wrongTopK").value) || 5;
+  const payload = await api("/tools/wrong-questions", {
+    method: "POST",
+    body: { raw_text, use_knowledge_base, kb_query, top_k },
+  });
+  $("wrongOut").textContent = payload?.markdown ?? "—";
+  $("wrongOut").hidden = false;
+  $("btnWrongCopy").hidden = false;
+  let meta = "完成";
+  if (use_knowledge_base) meta += ` · 知识库命中 ${payload.kb_hits ?? 0} 条`;
+  $("wrongMeta").textContent = meta;
+  toast("错题本已生成", "ok");
+}
+
+async function doMarkdownNotes() {
+  const topic = $("notesTopic").value.trim();
+  if (!topic) throw new Error("请输入主题或关键词");
+  $("notesMeta").textContent = "检索并生成中…";
+  $("notesOut").hidden = true;
+  $("btnNotesCopy").hidden = true;
+  const top_k = Number($("notesTopK").value) || 6;
+  const payload = await api("/tools/markdown-notes", {
+    method: "POST",
+    body: { topic, top_k },
+  });
+  $("notesOut").textContent = payload?.markdown ?? "—";
+  $("notesOut").hidden = false;
+  $("btnNotesCopy").hidden = false;
+  const n = (payload?.top_k_results || []).length;
+  $("notesMeta").textContent = `检索到 ${n} 条片段 · 已生成 Markdown`;
+  toast("笔记已生成", "ok");
+}
+
 async function doSearch() {
   const query = $("queryInput").value.trim();
   if (!query) throw new Error("请输入问题");
   $("answerOut").textContent = "检索中…";
   $("resultsOut").innerHTML = `<div class="muted">检索中…</div>`;
   const use_llm = $("useLlm").checked;
-  const payload = await api("/search/", { method: "POST", body: { query, use_llm } });
+  const top_k = Number($("topK").value) || 3;
+  const payload = await api("/search/", {
+    method: "POST",
+    body: { query, use_llm, top_k },
+  });
   renderSearchResults(payload);
   toast("搜索完成", "ok");
 }
@@ -224,11 +310,75 @@ function bindEvents() {
     $("docContent").value = "";
     $("createHint").textContent = "";
   });
+
+  const dropzone = $("dropzone");
+  const fileInput = $("fileInput");
+  const btnSelectFile = $("btnSelectFile");
+
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.classList.add("dropzone--dragover");
+  });
+  dropzone.addEventListener("dragleave", () => {
+    dropzone.classList.remove("dropzone--dragover");
+  });
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dropzone--dragover");
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleDocxFile(file);
+  });
+  dropzone.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+  btnSelectFile.addEventListener("click", (e) => {
+    e.stopPropagation();
+    fileInput.click();
+  });
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    if (file) handleDocxFile(file);
+    fileInput.value = "";
+  });
   $("docFilter").addEventListener("input", (e) => {
     state.docFilter = e.target.value;
     renderDocs();
   });
+  $("queryInput").addEventListener("input", syncQueryCharCount);
+  $("queryInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      doSearch().catch((err) => toast(err.message, "bad"));
+    }
+  });
+  $("btnClearQuery").addEventListener("click", () => {
+    $("queryInput").value = "";
+    syncQueryCharCount();
+    $("queryInput").focus();
+  });
   $("btnSearch").addEventListener("click", () => doSearch().catch((e) => toast(e.message, "bad")));
+
+  $("wrongUseKb").addEventListener("change", () => {
+    $("wrongKbRow").classList.toggle("is-hidden", !$("wrongUseKb").checked);
+  });
+  $("btnWrongGo").addEventListener("click", () =>
+    doWrongQuestions().catch((e) => {
+      $("wrongMeta").textContent = e.message;
+      toast(e.message, "bad");
+    }),
+  );
+  $("btnNotesGo").addEventListener("click", () =>
+    doMarkdownNotes().catch((e) => {
+      $("notesMeta").textContent = e.message;
+      toast(e.message, "bad");
+    }),
+  );
+  $("btnWrongCopy").addEventListener("click", () => copyMarkdown("wrongOut"));
+  $("btnNotesCopy").addEventListener("click", () => copyMarkdown("notesOut"));
 
   $("docsOut").addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
@@ -251,9 +401,31 @@ function bindEvents() {
   });
 }
 
+async function handleDocxFile(file) {
+  if (!file.name.toLowerCase().endsWith(".docx")) {
+    toast("仅支持 .docx 文件", "bad");
+    return;
+  }
+  $("createHint").textContent = "正在上传并由服务端解析 docx、写入索引…";
+  try {
+    const fd = new FormData();
+    fd.append("file", file, file.name);
+    const doc = await apiForm("/documents/import-docx", fd);
+    $("docTitle").value = "";
+    $("docContent").value = "";
+    $("createHint").textContent = `已导入文档 #${doc.id}：${doc.title}`;
+    toast(`已导入文档 #${doc.id}`, "ok");
+    await loadDocs({ silent: true });
+  } catch (e) {
+    $("createHint").textContent = e.message;
+    toast(e.message, "bad");
+  }
+}
+
 function init() {
   setApiBase(state.apiBase);
   bindEvents();
+  syncQueryCharCount();
   loadDocs().catch(() => {});
 }
 

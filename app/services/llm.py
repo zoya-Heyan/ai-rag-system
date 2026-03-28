@@ -76,3 +76,24 @@ async def ask_llm_async(question: str, context: str) -> str:
         return "⚠️ LLM quota exceeded."
     except Exception as e:
         return f"⚠️ LLM error: {str(e)}"
+
+
+async def chat_async(system: str, user: str, temperature: float = 0.35) -> str:
+    """Generic async chat for study tools (custom system prompt)."""
+    if not (settings.LLM_API_KEY or settings.LLM_BASE_URL):
+        return "LLM not configured. Set LLM_BASE_URL (and optionally LLM_API_KEY)."
+    client = _get_async_client()
+    try:
+        response = await client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            temperature=temperature,
+        )
+        return response.choices[0].message.content or ""
+    except RateLimitError:
+        return "⚠️ LLM quota exceeded."
+    except Exception as e:
+        return f"⚠️ LLM error: {str(e)}"
