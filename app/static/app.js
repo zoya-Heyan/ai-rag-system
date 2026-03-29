@@ -643,8 +643,14 @@ function initSettings() {
 
   async function viewDoc(id) {
     const doc = await api(`/documents/${id}`);
-    $("healthOut").textContent = prettyJson(doc);
-    toast(`#${id} → 状态栏`, "ok");
+    if ($("docViewDialog")) {
+      $("docViewTitle").textContent = doc.title || `(untitled #${id})`;
+      $("docViewBody").innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all">${escapeHtml(doc.content || "")}</pre>`;
+      $("docViewClose").onclick = () => $("docViewDialog").close();
+      $("docViewDialog").showModal();
+    } else {
+      $("healthOut").textContent = prettyJson(doc);
+    }
   }
 
   async function editDoc(id) {
@@ -785,8 +791,14 @@ function initDocuments() {
 
   async function viewDoc(id) {
     const doc = await api(`/documents/${id}`);
-    $("healthOut").textContent = prettyJson(doc);
-    toast(`#${id} → 状态栏`, "ok");
+    if ($("docViewDialog")) {
+      $("docViewTitle").textContent = doc.title || `(untitled #${id})`;
+      $("docViewBody").innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all">${escapeHtml(doc.content || "")}</pre>`;
+      $("docViewClose").onclick = () => $("docViewDialog").close();
+      $("docViewDialog").showModal();
+    } else {
+      $("healthOut").textContent = prettyJson(doc);
+    }
   }
 
   async function editDoc(id) {

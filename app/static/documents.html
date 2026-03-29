@@ -112,6 +112,13 @@
     </footer>
 
     <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
+    <dialog id="docViewDialog" class="dialog">
+      <div class="dialog__header">
+        <h2 class="dialog__title" id="docViewTitle"></h2>
+        <button class="btn btn--ghost btn--icon dialog__close" id="docViewClose">✕</button>
+      </div>
+      <div class="dialog__body" id="docViewBody"></div>
+    </dialog>
     <script src="/static/app.js" defer></script>
   </body>
 </html>
