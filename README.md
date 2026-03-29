@@ -1,121 +1,181 @@
 # AI RAG System
 
-> Intelligent Learning Assistant — Documents · Vector Search · LLM Answer
+> Intelligent Learning Assistant — Document Management, Vector Search, and LLM-Powered Responses
 
-基于 FastAPI + FAISS + bge-small-zh 的 RAG 学习助手，支持文档管理、智能问答、习题生成、笔记整理与题目解析。
-
----
-
-## 功能特性
-
-### 检索问答
-- 向量相似度检索（bge-small-zh embedding）
-- 结合 LLM（OpenAI-compatible API）生成回答
-- 支持调节 Top-K 数量
-- Markdown 渲染 + 源码切换
-
-### 学习工具
-| 模块 | 说明 |
-|------|------|
-| **生成习题** | 输入材料生成单选题/多选题/填空题/简答题，答案与解析集中在末尾；可结合知识库扩展 |
-| **笔记生成** | 输入主题从知识库检索相关片段，生成结构化 Markdown 笔记；自动保存草稿 |
-| **题目解析** | 输入任意题目（含可选答案），获取详细知识点讲解与延伸思考 |
-
-### 文档管理
-- 手动录入文档（标题 + 内容）
-- Word `.docx` 拖拽导入（服务端解析）
-- 文档列表过滤、查看、删除
+AI RAG System is a Retrieval-Augmented Generation learning assistant built on FastAPI, FAISS, and the bge-small-zh embedding model. It provides document management, intelligent Q&A, exercise generation, note organization, question analysis, study planning, and translation capabilities.
 
 ---
 
-## 技术架构
+## Features
+
+### Retrieval-Augmented Q&A
+- Vector similarity search powered by bge-small-zh embeddings (1024 dimensions)
+- LLM responses generated via OpenAI-compatible API based on retrieved context
+- Adjustable Top-K parameter for retrieval granularity
+- Markdown rendering with source reference toggling
+
+### Exercise Generation
+- Generate single-choice, multiple-choice, fill-in-the-blank, and essay questions from source materials
+- Answers and detailed analysis consolidated at the end of each output
+- Optional knowledge base augmentation for expanded question generation
+
+### Note Generation
+- Input a topic to retrieve relevant content chunks from the knowledge base
+- Generate structured Markdown notes automatically
+- Auto-saved drafts for continued editing
+
+### Question Analysis
+- Submit any question (with optional answer choices) for detailed explanation
+- Provides knowledge point breakdowns, problem-solving strategies, and extended reflection
+
+### Study Plan Generation
+- Personalized weekly study plans tailored to user proficiency level
+- Accounts for known topics, weak areas, preferred learning style, target subject, plan duration, and daily available hours
+- Optionally enhanced with knowledge base content
+
+### Translation Assistant
+- Three translation modes: Direct Translation, Refined Translation, Polished Translation
+- Supports 12 languages: Chinese, English, Japanese, Korean, French, German, Spanish, Russian, Arabic, Italian, Portuguese (with auto-detection)
+
+### Document Management
+- Manual document entry (title and content)
+- Word `.docx` drag-and-drop import with server-side text extraction
+- Document listing with filtering, viewing, and deletion
+
+---
+
+## Technical Architecture
 
 ```
 app/
-├── main.py              # FastAPI 入口，CORS / 静态文件 / 生命周期管理
-├── core/config.py       # 环境配置（Pydantic Settings）
-├── routers/
-│   ├── health.py        # 健康检查 & 索引状态
-│   ├── search.py        # 检索 + LLM 问答
-│   ├── documents.py     # 文档 CRUD
-│   └── tools.py         # 习题生成 / 笔记生成 / 题目解析
-├── services/
-│   ├── retrieval.py     # FAISS 向量检索
-│   ├── embedding.py     # bge-small-zh embedding
-│   ├── faiss_store.py   # FAISS 索引持久化
-│   ├── chunking.py      # 文本分块
-│   ├── llm.py           # OpenAI-compatible LLM 调用
-│   └── docx_text.py     # docx 文件文本提取
-└── db/
-    ├── database.py      # SQLite / PostgreSQL ORM 抽象
-    ├── postgres.py      # 异步 PostgreSQL 连接池（可选）
-    └── postgres_sync.py # 同步 PostgreSQL（可选）
+|-- main.py              # FastAPI entry point; CORS, static files, lifecycle management
+|-- core/
+|   |-- config.py        # Environment configuration via Pydantic Settings
+|-- routers/
+|   |-- health.py        # Health check and index status
+|   |-- search.py        # Retrieval and LLM Q&A
+|   |-- documents.py      # Document CRUD operations
+|   |-- tools.py          # Exercise generation, note generation, question analysis, translation
+|   |-- study_plan.py     # Personalized study plan generation
+|   |-- settings.py       # Static page routing
+|-- services/
+|   |-- retrieval.py      # FAISS vector retrieval
+|   |-- embedding.py      # bge-small-zh embedding via sentence-transformers
+|   |-- faiss_store.py    # FAISS index persistence
+|   |-- chunking.py       # Text chunking
+|   |-- llm.py            # OpenAI-compatible LLM invocation
+|   |-- docx_text.py      # .docx file text extraction
+|   |-- study_plan_generator.py  # Fallback study plan generation
+|   |-- index_queue.py    # Background indexing worker
+|-- db/
+|   |-- database.py       # SQLite ORM abstraction
+|   |-- postgres.py       # Async PostgreSQL connection pool (optional)
+|   |-- postgres_sync.py  # Sync PostgreSQL (optional)
 ```
 
-- **Embedding**: `bge-small-zh`（1024 维）
-- **向量索引**: FAISS IndexFlatIP（余弦相似度）
-- **LLM**: OpenAI-compatible API（默认 Qwen 7B）
-- **数据库**: SQLite（默认）/ PostgreSQL（可选）
-- **Chunk**: 默认 ~400 字符，50 字符 overlap
+### Core Technologies
+- **Embedding Model**: bge-small-zh (1024 dimensions, normalized)
+- **Vector Index**: FAISS IndexFlatIP (inner product for cosine similarity)
+- **LLM**: OpenAI-compatible API (default: Qwen 7B)
+- **Database**: SQLite (default) / PostgreSQL (optional)
+- **Text Chunking**: Default ~400 characters with 50-character overlap
+- **Async Processing**: ThreadPoolExecutor for CPU-bound embedding computation
+- **Background Workers**: Queue-based indexing worker for document processing
 
 ---
 
-## 快速开始
+## Getting Started
 
-### 1. 安装依赖
+### 1. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 配置环境变量
+### 2. Configure Environment Variables
 
 ```bash
-# .env 示例
+# .env example
 OPENAI_API_KEY=your_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1   # 或你的代理地址
-# DATABASE_URL=postgresql+asyncpg://user:pass@host/db  # 可选：使用 PostgreSQL
+OPENAI_BASE_URL=https://api.openai.com/v1   # or your proxy address
+# DATABASE_URL=postgresql+asyncpg://user:pass@host/db  # Optional: use PostgreSQL
 ```
 
-### 3. 启动服务
+### 3. Start the Service
 
 ```bash
 cd /path/to/ai-rag-system
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-访问 `http://localhost:8000` 打开 Web UI。
+Access `http://localhost:8000` to open the Web UI.
 
 ---
 
-## 前端界面
+## Frontend Interface
 
-- **Eco-themed UI**：柔和大地色系 + 森林绿主色调，支持亮色 / 暗色主题切换
-- **语言**：内置中文 / English 双语，通过语言切换按钮即时切换
-- **主题与语言**偏好自动保存至 `localStorage`
-
----
-
-## API 概览
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/` | 静态页面 |
-| GET | `/health` | 健康检查 |
-| GET | `/health/index` | 索引状态（文档数） |
-| POST | `/search` | 检索 + LLM 问答 |
-| GET | `/documents` | 文档列表 |
-| POST | `/documents` | 创建文档 |
-| DELETE | `/documents/{id}` | 删除文档 |
-| POST | `/tools/generate-questions` | 生成习题 |
-| POST | `/tools/generate-notes` | 生成笔记 |
-| POST | `/tools/analyze-question` | 题目解析 |
+- **Design**: Eco-themed UI with warm earth tones and forest green accents, supporting light/dark theme switching
+- **Internationalization**: Built-in Chinese/English bilingual support with real-time language toggle
+- **Persistence**: Theme and language preferences saved to localStorage
 
 ---
 
-## 扩展方向
+## API Reference
 
-- 切换 Embedding 模型（`sentence-transformers` 支持任意模型）
-- 接入 PostgreSQL + pgvector 实现大规模向量存储
-- 接入 LangChain / LlamaIndex 增强 LLM 调用链
-- 部署至 Docker / Kubernetes
+### Core Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Static page (home) |
+| GET | `/health` | Health check |
+| GET | `/health/index` | Index status (document count) |
+| POST | `/search` | Vector search + LLM Q&A |
+
+### Document Management
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/documents` | Document list |
+| POST | `/documents` | Create document |
+| DELETE | `/documents/{id}` | Delete document |
+
+### Learning Tools
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/tools/generate-questions` | Generate exercises |
+| POST | `/tools/markdown-notes` | Generate study notes |
+| POST | `/tools/analyze-question` | Analyze questions |
+
+### Study Planning
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/study-plan/generate` | Generate personalized study plan |
+
+### Translation
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/tools/translate` | Translate text |
+
+### Page Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/qa` | Q&A page |
+| GET | `/questions` | Exercise generation page |
+| GET | `/notes` | Note generation page |
+| GET | `/analysis` | Question analysis page |
+| GET | `/study-plan` | Study plan page |
+| GET | `/translation` | Translation page |
+| GET | `/settings` | Settings page |
+
+---
+
+## Extension Possibilities
+
+- Swap embedding models (sentence-transformers supports arbitrary models)
+- Integrate PostgreSQL + pgvector for large-scale vector storage
+- Integrate LangChain / LlamaIndex for enhanced LLM orchestration
+- Deploy via Docker / Kubernetes for production environments
