@@ -377,6 +377,19 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
+function typewriter(el, text, speed = 18) {
+  el.textContent = "";
+  let i = 0;
+  function step() {
+    if (i < text.length) {
+      el.textContent += text.charAt(i);
+      i++;
+      setTimeout(step, speed);
+    }
+  }
+  step();
+}
+
 function copyText(text) {
   return navigator.clipboard.writeText(text);
 }
@@ -523,7 +536,8 @@ function initQA() {
   }
 
   function renderSearchResults(payload) {
-    answerOut.textContent = payload?.answer ?? "—";
+    const text = payload?.answer ?? "—";
+    typewriter(answerOut, text);
     const list = payload?.top_k_results || [];
     const out = $("resultsOut");
     if (!list.length) { out.innerHTML = `<div class="muted">${t("noResults")}</div>`; return; }
@@ -906,7 +920,7 @@ function initQuestions() {
         method: "POST", body: { source_text, use_knowledge_base, kb_query, top_k },
       });
       questionsMd = payload?.markdown ?? "—";
-      $("wrongOut").textContent = questionsMd;
+      typewriter($("wrongOut"), questionsMd);
       renderMdPreview("wrongPreview", "wrongOut", questionsMd);
       $("wrongActions").hidden = false;
       let meta = t("questionsDone");
@@ -1046,7 +1060,7 @@ function initNotes() {
     try {
       const payload = await api("/tools/markdown-notes", { method: "POST", body: { topic, top_k } });
       notesMd = payload?.markdown ?? "—";
-      $("notesOut").textContent = notesMd;
+      typewriter($("notesOut"), notesMd);
       renderMdPreview("notesPreview", "notesOut", notesMd);
       $("notesActions").hidden = false;
       const n = (payload?.top_k_results || []).length;
@@ -1139,7 +1153,7 @@ function initAnalysis() {
         method: "POST", body: { question, answer },
       });
       analysisMd = payload?.markdown ?? "—";
-      $("analysisOut").textContent = analysisMd;
+      typewriter($("analysisOut"), analysisMd);
       renderMdPreview("analysisPreview", "analysisOut", analysisMd);
       $("analysisActions").hidden = false;
       $("analysisMeta").textContent = t("analysisDone");
