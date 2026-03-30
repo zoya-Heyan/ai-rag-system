@@ -120,6 +120,9 @@ Access `http://localhost:8000` to open the Web UI.
 
 ---
 
+![Overview](overview.jpg)
+
+
 ## API Reference
 
 ### Core Endpoints

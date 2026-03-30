@@ -976,21 +976,34 @@ function initQuestions() {
 
   let questionsMd = "";
 
+  // ✅ 只去掉最外层 ```，不删除内容
   function stripMd(md) {
-    return (md || "").replace(/```(?:markdown|md)?\n?[\s\S]*?```/gi, "").replace(/^```\s*$/gm, "").trim();
+    return (md || "")
+      .replace(/^```(?:markdown|md)?\n?/i, "")
+      .replace(/```$/, "")
+      .trim();
   }
 
   async function renderMdPreview(previewId, outId, md) {
     const preview = $(previewId);
     const out = $(outId);
-    if (!md || !md.trim()) { preview.innerHTML = `<span class="muted">—</span>`; return; }
+
+    if (!md || !md.trim()) {
+      preview.innerHTML = `<span class="muted">—</span>`;
+      preview.hidden = false;
+      out.hidden = true;
+      return;
+    }
+
     const clean = stripMd(md);
+
     if (typeof marked !== "undefined") {
       const html = await Promise.resolve(marked.parse(clean));
       preview.innerHTML = html;
       preview.hidden = false;
       out.hidden = true;
     } else {
+      // fallback：显示原始文本
       out.textContent = md;
       out.hidden = false;
       preview.hidden = true;
@@ -1005,42 +1018,67 @@ function initQuestions() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(URL);
+    URL.revokeObjectURL(a.href);
     toast(`${t("downloadedOk")}: ${filename}`, "ok");
   }
 
-  function copyMd(preId) {
-    const text = $(preId)?.textContent ?? "";
-    if (!text.trim()) { toast(t("emptyMaterial"), "bad"); return; }
-    copyText(text).then(() => toast(t("copiedMd"), "ok")).catch(() => toast(t("copiedFail"), "bad"));
+  function copyMd() {
+    const text = questionsMd || "";
+    if (!text.trim()) {
+      toast(t("emptyMaterial"), "bad");
+      return;
+    }
+    copyText(text)
+      .then(() => toast(t("copiedMd"), "ok"))
+      .catch(() => toast(t("copiedFail"), "bad"));
   }
 
   async function doQuestions() {
     const source_text = $("wrongInput").value.trim();
-    if (!source_text) { toast(t("emptyMaterial"), "bad"); return; }
+    if (!source_text) {
+      toast(t("emptyMaterial"), "bad");
+      return;
+    }
+
     $("wrongMeta").textContent = "…";
-    $("wrongOut").hidden = true; $("wrongPreview").hidden = true; $("wrongActions").hidden = true;
+    $("wrongOut").hidden = true;
+    $("wrongPreview").hidden = true;
+    $("wrongActions").hidden = true;
+
     const use_knowledge_base = $("wrongUseKb").checked;
     const kb_query = $("wrongKbQuery").value.trim() || null;
     const top_k = Number($("wrongTopK").value) || 5;
+
     try {
       const payload = await api("/tools/generate-questions", {
-        method: "POST", body: { source_text, use_knowledge_base, kb_query, top_k },
+        method: "POST",
+        body: { source_text, use_knowledge_base, kb_query, top_k },
       });
+
       questionsMd = payload?.markdown ?? "—";
-      typewriter($("wrongOut"), questionsMd);
-      renderMdPreview("wrongPreview", "wrongOut", questionsMd);
+      $("wrongOut").textContent = questionsMd;
+      await renderMdPreview("wrongPreview", "wrongOut", questionsMd);
+
       $("wrongActions").hidden = false;
       setQuestionsView("preview");
+
       let meta = t("questionsDone");
-      if (use_knowledge_base) meta += ` · ${t("kbHits")} ${payload.kb_hits ?? 0}`;
+      if (use_knowledge_base) {
+        meta += ` · ${t("kbHits")} ${payload.kb_hits ?? 0}`;
+      }
       $("wrongMeta").textContent = meta;
+
       const el = $("wrongRefs");
       if (el) {
         const results = payload?.top_k_results || [];
-        const titles = results.slice(0, 3).map((r) => r.document_title || `#${r.document_id}`).join(", ");
-        el.textContent = titles + (results.length > 3 ? ` +${results.length - 3}` : "");
+        const titles = results
+          .slice(0, 3)
+          .map((r) => r.document_title || `#${r.document_id}`)
+          .join(", ");
+        el.textContent =
+          titles + (results.length > 3 ? ` +${results.length - 3}` : "");
       }
+
       toast(t("questionsDone"), "ok");
     } catch (e) {
       $("wrongMeta").textContent = e.message;
@@ -1051,26 +1089,53 @@ function initQuestions() {
   function setQuestionsView(view) {
     $("btnWrongView")?.classList.toggle("btn--active", view === "preview");
     $("btnWrongRaw")?.classList.toggle("btn--active", view === "raw");
-    if (view === "preview") { $("wrongPreview").hidden = false; $("wrongOut").hidden = true; }
-    else { $("wrongPreview").hidden = true; $("wrongOut").hidden = false; }
+
+    if (view === "preview") {
+      $("wrongPreview").hidden = false;
+      $("wrongOut").hidden = true;
+    } else {
+      $("wrongPreview").hidden = true;
+      $("wrongOut").hidden = false;
+    }
   }
 
   $("wrongUseKb").addEventListener("change", () => {
-    $("wrongKbRow").classList.toggle("is-hidden", !$("wrongUseKb").checked);
+    $("wrongKbRow").classList.toggle(
+      "is-hidden",
+      !$("wrongUseKb").checked
+    );
   });
+
   $("btnWrongGo").addEventListener("click", doQuestions);
+
   $("btnWrongClear").addEventListener("click", () => {
-    $("wrongInput").value = ""; $("wrongMeta").textContent = "";
-    $("wrongOut").textContent = ""; $("wrongOut").hidden = true;
-    $("wrongPreview").innerHTML = ""; $("wrongPreview").hidden = true;
-    $("wrongActions").hidden = true; questionsMd = "";
+    $("wrongInput").value = "";
+    $("wrongMeta").textContent = "";
+
+    $("wrongOut").textContent = "";
+    $("wrongOut").hidden = true;
+
+    $("wrongPreview").innerHTML = "";
+    $("wrongPreview").hidden = true;
+
+    $("wrongActions").hidden = true;
+    questionsMd = "";
   });
-  $("btnWrongView").addEventListener("click", () => setQuestionsView("preview"));
-  $("btnWrongRaw").addEventListener("click", () => setQuestionsView("raw"));
-  $("btnWrongCopy").addEventListener("click", () => copyMd("wrongOut"));
+
+  $("btnWrongView").addEventListener("click", () =>
+    setQuestionsView("preview")
+  );
+  $("btnWrongRaw").addEventListener("click", () =>
+    setQuestionsView("raw")
+  );
+
+  // ✅ 修复 copy：直接用 questionsMd
+  $("btnWrongCopy").addEventListener("click", copyMd);
+
+  // ✅ 修复 download：直接用 questionsMd
   $("btnWrongDownload").addEventListener("click", () => {
     const fn = `questions_${Date.now()}.md`;
-    downloadMd($("wrongOut").textContent || questionsMd, fn);
+    downloadMd(questionsMd, fn);
   });
 }
 
@@ -1227,46 +1292,82 @@ function initAnalysis() {
   let analysisMd = "";
 
   function stripMd(md) {
-    return (md || "").replace(/```(?:markdown|md)?\n?[\s\S]*?```/gi, "").replace(/^```\s*$/gm, "").trim();
+  let text = (md || "").trim();
+
+  for (let i = 0; i < 3; i++) {
+    text = text
+      .replace(/^```(?:markdown|md)?\n?/i, "")
+      .replace(/```$/, "")
+      .trim();
   }
+
+  return text;
+}
 
   async function renderMdPreview(previewId, outId, md) {
     const preview = $(previewId);
     const out = $(outId);
-    if (!md || !md.trim()) { preview.innerHTML = `<span class="muted">—</span>`; return; }
+
+    if (!md || !md.trim()) {
+      preview.innerHTML = `<span class="muted">—</span>`;
+      preview.hidden = false;
+      out.hidden = true;
+      return;
+    }
+
     const clean = stripMd(md);
+
     if (typeof marked !== "undefined") {
       const html = await Promise.resolve(marked.parse(clean));
       preview.innerHTML = html;
       preview.hidden = false;
       out.hidden = true;
     } else {
+      // fallback：显示原始文本
       out.textContent = md;
       out.hidden = false;
       preview.hidden = true;
     }
   }
 
-  function copyMd(preId) {
-    const text = $(preId)?.textContent ?? "";
-    if (!text.trim()) { toast(t("emptyMaterial"), "bad"); return; }
-    copyText(text).then(() => toast(t("copiedMd"), "ok")).catch(() => toast(t("copiedFail"), "bad"));
+  // ✅ 直接用 analysisMd，不依赖 DOM
+  function copyMd() {
+    if (!analysisMd.trim()) {
+      toast(t("emptyMaterial"), "bad");
+      return;
+    }
+    copyText(analysisMd)
+      .then(() => toast(t("copiedMd"), "ok"))
+      .catch(() => toast(t("copiedFail"), "bad"));
   }
 
   async function doAnalysis() {
     const question = $("analysisQuestion").value.trim();
-    if (!question) { toast(t("emptyQuestion"), "bad"); return; }
+    if (!question) {
+      toast(t("emptyQuestion"), "bad");
+      return;
+    }
+
     $("analysisMeta").textContent = "…";
-    $("analysisOut").hidden = true; $("analysisPreview").hidden = true; $("analysisActions").hidden = true;
+    $("analysisOut").hidden = true;
+    $("analysisPreview").hidden = true;
+    $("analysisActions").hidden = true;
+
     const answer = $("analysisAnswer").value.trim() || null;
+
     try {
       const payload = await api("/tools/analyze-question", {
-        method: "POST", body: { question, answer },
+        method: "POST",
+        body: { question, answer },
       });
+
       analysisMd = payload?.markdown ?? "—";
-      typewriter($("analysisOut"), analysisMd);
-      renderMdPreview("analysisPreview", "analysisOut", analysisMd);
+      $("analysisOut").textContent = analysisMd;
+      await renderMdPreview("analysisPreview", "analysisOut", analysisMd);
+
       $("analysisActions").hidden = false;
+      setAnalysisView("preview");
+
       $("analysisMeta").textContent = t("analysisDone");
       toast(t("analysisDone"), "ok");
     } catch (e) {
@@ -1278,21 +1379,43 @@ function initAnalysis() {
   function setAnalysisView(view) {
     $("btnAnalysisView")?.classList.toggle("btn--active", view === "preview");
     $("btnAnalysisRaw")?.classList.toggle("btn--active", view === "raw");
-    if (view === "preview") { $("analysisPreview").hidden = false; $("analysisOut").hidden = true; }
-    else { $("analysisPreview").hidden = true; $("analysisOut").hidden = false; }
+
+    if (view === "preview") {
+      $("analysisPreview").hidden = false;
+      $("analysisOut").hidden = true;
+    } else {
+      $("analysisPreview").hidden = true;
+      $("analysisOut").hidden = false;
+    }
   }
 
   $("btnAnalysisGo").addEventListener("click", doAnalysis);
+
   $("btnAnalysisClear").addEventListener("click", () => {
-    $("analysisQuestion").value = ""; $("analysisAnswer").value = "";
+    $("analysisQuestion").value = "";
+    $("analysisAnswer").value = "";
+
     $("analysisMeta").textContent = "";
-    $("analysisOut").textContent = ""; $("analysisOut").hidden = true;
-    $("analysisPreview").innerHTML = ""; $("analysisPreview").hidden = true;
-    $("analysisActions").hidden = true; analysisMd = "";
+
+    $("analysisOut").textContent = "";
+    $("analysisOut").hidden = true;
+
+    $("analysisPreview").innerHTML = "";
+    $("analysisPreview").hidden = true;
+
+    $("analysisActions").hidden = true;
+
+    analysisMd = "";
   });
-  $("btnAnalysisView").addEventListener("click", () => setAnalysisView("preview"));
-  $("btnAnalysisRaw").addEventListener("click", () => setAnalysisView("raw"));
-  $("btnAnalysisCopy").addEventListener("click", () => copyMd("analysisOut"));
+
+  $("btnAnalysisView").addEventListener("click", () =>
+    setAnalysisView("preview")
+  );
+  $("btnAnalysisRaw").addEventListener("click", () =>
+    setAnalysisView("raw")
+  );
+
+  $("btnAnalysisCopy").addEventListener("click", copyMd);
 }
 
 /* ─────────────────────────────────────────────
